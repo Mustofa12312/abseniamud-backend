@@ -11,6 +11,8 @@ use App\Models\AttendanceCorrection;
 use App\Models\AuditLog;
 use App\Models\Setting;
 use App\Models\Room;
+use App\Models\Faculty;
+use App\Models\Course;
 use Carbon\Carbon;
 
 class AdminController extends Controller
@@ -485,5 +487,94 @@ class AdminController extends Controller
             'success' => true,
             'message' => 'Ruangan berhasil dihapus.'
         ]);
+    }
+
+    /**
+     * Get all faculties.
+     */
+    public function faculties()
+    {
+        $faculties = Faculty::orderBy('name')->get();
+        return response()->json([
+            'success' => true,
+            'data' => $faculties
+        ]);
+    }
+
+    public function storeFaculty(Request $request)
+    {
+        $request->validate(['name' => 'required|string', 'code' => 'nullable|string']);
+        $faculty = Faculty::create($request->all());
+        return response()->json(['success' => true, 'message' => 'Fakultas / Prodi berhasil ditambahkan.', 'data' => $faculty]);
+    }
+
+    public function updateFaculty(Request $request, $id)
+    {
+        $faculty = Faculty::findOrFail($id);
+        $request->validate(['name' => 'required|string', 'code' => 'nullable|string']);
+        $faculty->update($request->all());
+        return response()->json(['success' => true, 'message' => 'Fakultas / Prodi berhasil diperbarui.', 'data' => $faculty]);
+    }
+
+    public function destroyFaculty($id)
+    {
+        Faculty::findOrFail($id)->delete();
+        return response()->json(['success' => true, 'message' => 'Fakultas / Prodi berhasil dihapus.']);
+    }
+
+    /**
+     * Get all courses.
+     */
+    public function courses(Request $request)
+    {
+        $query = Course::with('faculty');
+        
+        if ($request->has('faculty_id') && $request->faculty_id) {
+            $query->where('faculty_id', $request->faculty_id);
+        }
+        
+        if ($request->has('semester') && $request->semester) {
+            $query->where('semester', $request->semester);
+        }
+
+        $courses = $query->orderBy('name')->get();
+        
+        return response()->json([
+            'success' => true,
+            'data' => $courses
+        ]);
+    }
+
+    public function storeCourse(Request $request)
+    {
+        $request->validate([
+            'faculty_id' => 'required|exists:faculties,id',
+            'name' => 'required|string',
+            'code' => 'nullable|string',
+            'semester' => 'required|integer',
+            'sks' => 'required|integer'
+        ]);
+        $course = Course::create($request->all());
+        return response()->json(['success' => true, 'message' => 'Mata Kuliah berhasil ditambahkan.', 'data' => $course]);
+    }
+
+    public function updateCourse(Request $request, $id)
+    {
+        $course = Course::findOrFail($id);
+        $request->validate([
+            'faculty_id' => 'required|exists:faculties,id',
+            'name' => 'required|string',
+            'code' => 'nullable|string',
+            'semester' => 'required|integer',
+            'sks' => 'required|integer'
+        ]);
+        $course->update($request->all());
+        return response()->json(['success' => true, 'message' => 'Mata Kuliah berhasil diperbarui.', 'data' => $course]);
+    }
+
+    public function destroyCourse($id)
+    {
+        Course::findOrFail($id)->delete();
+        return response()->json(['success' => true, 'message' => 'Mata Kuliah berhasil dihapus.']);
     }
 }
