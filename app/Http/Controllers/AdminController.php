@@ -10,6 +10,7 @@ use App\Models\AttendanceRecord;
 use App\Models\AttendanceCorrection;
 use App\Models\AuditLog;
 use App\Models\Setting;
+use App\Models\Room;
 use Carbon\Carbon;
 
 class AdminController extends Controller
@@ -413,6 +414,74 @@ class AdminController extends Controller
         return response()->json([
             'success' => true,
             'data' => $logs
+        ]);
+    }
+
+    /**
+     * Get all rooms.
+     */
+    public function rooms()
+    {
+        $rooms = Room::orderBy('name')->get();
+        return response()->json([
+            'success' => true,
+            'data' => $rooms
+        ]);
+    }
+
+    /**
+     * Store a new room.
+     */
+    public function storeRoom(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'capacity' => 'nullable|integer',
+            'description' => 'nullable|string'
+        ]);
+
+        $room = Room::create($request->all());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Ruangan berhasil ditambahkan.',
+            'data' => $room
+        ]);
+    }
+
+    /**
+     * Update room.
+     */
+    public function updateRoom(Request $request, $id)
+    {
+        $room = Room::findOrFail($id);
+        
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'capacity' => 'nullable|integer',
+            'description' => 'nullable|string'
+        ]);
+
+        $room->update($request->all());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Ruangan berhasil diperbarui.',
+            'data' => $room
+        ]);
+    }
+
+    /**
+     * Delete room.
+     */
+    public function destroyRoom($id)
+    {
+        $room = Room::findOrFail($id);
+        $room->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Ruangan berhasil dihapus.'
         ]);
     }
 }
