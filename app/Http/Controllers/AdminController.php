@@ -13,6 +13,7 @@ use App\Models\Setting;
 use App\Models\Room;
 use App\Models\Faculty;
 use App\Models\Course;
+use App\Models\AcademicYear;
 use Carbon\Carbon;
 
 class AdminController extends Controller
@@ -576,5 +577,65 @@ class AdminController extends Controller
     {
         Course::findOrFail($id)->delete();
         return response()->json(['success' => true, 'message' => 'Mata Kuliah berhasil dihapus.']);
+    }
+
+    /**
+     * Get all academic years.
+     */
+    public function academicYears()
+    {
+        $years = AcademicYear::orderBy('name', 'desc')->get();
+        return response()->json([
+            'success' => true,
+            'data' => $years
+        ]);
+    }
+
+    public function activeAcademicYear()
+    {
+        $year = AcademicYear::where('is_active', true)->first();
+        return response()->json([
+            'success' => true,
+            'data' => $year
+        ]);
+    }
+
+    public function storeAcademicYear(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string',
+            'term' => 'required|in:Ganjil,Genap',
+            'is_active' => 'boolean'
+        ]);
+        
+        if ($request->is_active) {
+            AcademicYear::where('is_active', true)->update(['is_active' => false]);
+        }
+        
+        $year = AcademicYear::create($request->all());
+        return response()->json(['success' => true, 'message' => 'Tahun Akademik berhasil ditambahkan.', 'data' => $year]);
+    }
+
+    public function updateAcademicYear(Request $request, $id)
+    {
+        $year = AcademicYear::findOrFail($id);
+        $request->validate([
+            'name' => 'required|string',
+            'term' => 'required|in:Ganjil,Genap',
+            'is_active' => 'boolean'
+        ]);
+
+        if ($request->is_active && !$year->is_active) {
+            AcademicYear::where('is_active', true)->update(['is_active' => false]);
+        }
+
+        $year->update($request->all());
+        return response()->json(['success' => true, 'message' => 'Tahun Akademik berhasil diperbarui.', 'data' => $year]);
+    }
+
+    public function destroyAcademicYear($id)
+    {
+        AcademicYear::findOrFail($id)->delete();
+        return response()->json(['success' => true, 'message' => 'Tahun Akademik berhasil dihapus.']);
     }
 }
