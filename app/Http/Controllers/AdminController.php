@@ -228,6 +228,8 @@ class AdminController extends Controller
             'Rabu' => [],
             'Kamis' => [],
             'Jumat' => [],
+            'Sabtu' => [],
+            'Minggu' => [],
         ];
 
         return response()->json([
