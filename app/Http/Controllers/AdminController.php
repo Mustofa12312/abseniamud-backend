@@ -528,7 +528,7 @@ class AdminController extends Controller
      */
     public function courses(Request $request)
     {
-        $query = Course::with('faculty');
+        $query = Course::with(['faculty', 'lecturer.user']);
         
         if ($request->has('faculty_id') && $request->faculty_id) {
             $query->where('faculty_id', $request->faculty_id);
@@ -538,7 +538,11 @@ class AdminController extends Controller
             $query->where('semester', $request->semester);
         }
 
-        $courses = $query->orderBy('name')->get();
+        $courses = $query->orderBy('name')->get()->map(function($course) {
+            $courseArray = $course->toArray();
+            $courseArray['lecturer_name'] = $course->lecturer ? ($course->lecturer->user->name ?? 'Unknown') : null;
+            return $courseArray;
+        });
         
         return response()->json([
             'success' => true,
@@ -550,13 +554,17 @@ class AdminController extends Controller
     {
         $request->validate([
             'faculty_id' => 'required|exists:faculties,id',
+            'lecturer_id' => 'nullable|exists:lecturers,id',
             'name' => 'required|string',
             'code' => 'nullable|string',
             'semester' => 'required|integer',
             'sks' => 'required|integer'
         ]);
         $course = Course::create($request->all());
-        return response()->json(['success' => true, 'message' => 'Mata Kuliah berhasil ditambahkan.', 'data' => $course]);
+        $course->load('lecturer.user');
+        $courseArray = $course->toArray();
+        $courseArray['lecturer_name'] = $course->lecturer ? ($course->lecturer->user->name ?? 'Unknown') : null;
+        return response()->json(['success' => true, 'message' => 'Mata Kuliah berhasil ditambahkan.', 'data' => $courseArray]);
     }
 
     public function updateCourse(Request $request, $id)
@@ -564,13 +572,17 @@ class AdminController extends Controller
         $course = Course::findOrFail($id);
         $request->validate([
             'faculty_id' => 'required|exists:faculties,id',
+            'lecturer_id' => 'nullable|exists:lecturers,id',
             'name' => 'required|string',
             'code' => 'nullable|string',
             'semester' => 'required|integer',
             'sks' => 'required|integer'
         ]);
         $course->update($request->all());
-        return response()->json(['success' => true, 'message' => 'Mata Kuliah berhasil diperbarui.', 'data' => $course]);
+        $course->load('lecturer.user');
+        $courseArray = $course->toArray();
+        $courseArray['lecturer_name'] = $course->lecturer ? ($course->lecturer->user->name ?? 'Unknown') : null;
+        return response()->json(['success' => true, 'message' => 'Mata Kuliah berhasil diperbarui.', 'data' => $courseArray]);
     }
 
     public function destroyCourse($id)
