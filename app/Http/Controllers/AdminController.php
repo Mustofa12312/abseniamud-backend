@@ -23,9 +23,17 @@ use App\Http\Resources\LocationResource;
 use App\Http\Resources\LecturerResource;
 use App\Http\Resources\CorrectionResource;
 use App\Http\Resources\AuditLogResource;
+use App\Services\AuditLogService;
 
 class AdminController extends Controller
 {
+    protected $auditLogService;
+
+    public function __construct(AuditLogService $auditLogService)
+    {
+        $this->auditLogService = $auditLogService;
+    }
+
     /**
      * Get dashboard statistics.
      */
@@ -128,6 +136,50 @@ class AdminController extends Controller
             'success' => true,
             'data' => $formattedData,
             'date' => Carbon::parse($date)->translatedFormat('d F Y')
+        ]);
+    }
+
+    /**
+     * Get attendance details for a specific lecturer in a month.
+     */
+    public function attendanceDetails(Request $request, $id)
+    {
+        $lecturer = Lecturer::with('user')->findOrFail($id);
+        $user = $lecturer->user;
+        
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'User not found'], 404);
+        }
+
+        $month = $request->query('month', Carbon::now()->month);
+        $year = $request->query('year', Carbon::now()->year);
+
+        $records = AttendanceRecord::with(['checkInEvent.location', 'checkOutEvent'])
+            ->where('user_id', $user->id)
+            ->whereMonth('date', $month)
+            ->whereYear('date', $year)
+            ->orderBy('date', 'desc')
+            ->get()
+            ->map(function ($record) {
+                return [
+                    'id'       => $record->id,
+                    'date'     => Carbon::parse($record->date)->translatedFormat('d M Y'),
+                    'raw_date' => $record->date->toDateString(),
+                    'checkIn'  => $record->checkInEvent ? Carbon::parse($record->checkInEvent->event_time)->format('H:i') : '-',
+                    'checkOut' => $record->checkOutEvent ? Carbon::parse($record->checkOutEvent->event_time)->format('H:i') : '-',
+                    'location' => $record->checkInEvent?->location?->name ?? '-',
+                    'status'   => $record->status,
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => $records,
+            'lecturer' => [
+                'name' => $user->name,
+                'nidn' => $lecturer->nidn
+            ],
+            'period' => Carbon::createFromDate($year, $month, 1)->translatedFormat('F Y')
         ]);
     }
 
@@ -256,6 +308,20 @@ class AdminController extends Controller
         $lecturers = Lecturer::with('user')->get();
         $reportData = [];
 
+        // Calculate working days dynamically (excluding Sundays)
+        $startOfMonth = Carbon::create($year, $month, 1);
+        $daysInMonth = $startOfMonth->daysInMonth;
+        $totalDays = 0;
+        
+        for ($d = 1; $d <= $daysInMonth; $d++) {
+            $currentDate = Carbon::create($year, $month, $d);
+            if (!$currentDate->isSunday()) {
+                $totalDays++;
+            }
+        }
+        
+        if ($totalDays === 0) $totalDays = 1; // Prevent division by zero
+
         foreach ($lecturers as $lecturer) {
             $user = $lecturer->user;
             if (!$user) continue;
@@ -264,9 +330,8 @@ class AdminController extends Controller
             
             $hadir = $userRecords->where('status', 'HADIR')->count();
             $terlambat = $userRecords->where('status', 'TERLAMBAT')->count();
-            $alpha = $userRecords->where('status', 'TIDAK_HADIR')->count();
-            // Just simulate total working days for a month
-            $totalDays = 22;
+            $alpha = $totalDays - ($hadir + $terlambat); // Alpha is remaining days without presence
+            if ($alpha < 0) $alpha = 0;
 
             $reportData[] = [
                 'id' => $lecturer->id,
@@ -332,13 +397,12 @@ class AdminController extends Controller
         }
 
         // Record Audit Log
-        AuditLog::create([
-            'user_id' => $request->user()->id,
-            'action' => 'UPDATE_SETTINGS',
-            'target' => 'System Settings',
-            'details' => $data,
-            'ip_address' => $request->ip()
-        ]);
+        $this->auditLogService->log(
+            $request->user()->id,
+            'UPDATE_SETTINGS',
+            'System Settings',
+            $data
+        );
 
         return response()->json([
             'success' => true,
@@ -397,17 +461,16 @@ class AdminController extends Controller
         );
 
         // Record Audit Log
-        AuditLog::create([
-            'user_id' => $request->user()->id,
-            'action' => 'APPROVE_CORRECTION',
-            'target' => 'Correction ID: ' . $id . ' | User ID: ' . $correction->user_id,
-            'details' => [
+        $this->auditLogService->log(
+            $request->user()->id,
+            'APPROVE_CORRECTION',
+            'Correction ID: ' . $id . ' | User ID: ' . $correction->user_id,
+            [
                 'reason' => $correction->reason,
                 'date' => $correction->date,
                 'type' => $correction->type
-            ],
-            'ip_address' => $request->ip()
-        ]);
+            ]
+        );
 
         return response()->json([
             'success' => true,
@@ -432,16 +495,15 @@ class AdminController extends Controller
         ]);
 
         // Record Audit Log
-        AuditLog::create([
-            'user_id' => $request->user()->id,
-            'action' => 'REJECT_CORRECTION',
-            'target' => 'Correction ID: ' . $id . ' | User ID: ' . $correction->user_id,
-            'details' => [
+        $this->auditLogService->log(
+            $request->user()->id,
+            'REJECT_CORRECTION',
+            'Correction ID: ' . $id . ' | User ID: ' . $correction->user_id,
+            [
                 'reason' => $correction->reason,
                 'date' => $correction->date
-            ],
-            'ip_address' => $request->ip()
-        ]);
+            ]
+        );
 
         return response()->json([
             'success' => true,

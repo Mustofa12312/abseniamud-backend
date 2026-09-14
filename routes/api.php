@@ -25,6 +25,7 @@ Route::post('/auth/login', [AuthController::class, 'login']);
 Route::middleware('auth:sanctum')->group(function () {
     // User Profile
     Route::get('/me', [AuthController::class, 'me']);
+    Route::put('/me', [UserController::class, 'updateProfile']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
 
     // Attendance
@@ -42,6 +43,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('admin')->middleware('role:super_admin,admin_akademik')->group(function () {
         Route::get('/dashboard', [AdminController::class, 'dashboard']);
         Route::get('/attendance', [AdminController::class, 'attendance']);
+        Route::get('/attendance/{id}', [AdminController::class, 'attendanceDetails']);
         // Master Data
         Route::get('/locations', [AdminController::class, 'locations']);
         Route::post('/locations', [AdminController::class, 'storeLocation']);

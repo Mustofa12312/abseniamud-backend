@@ -106,12 +106,12 @@ class AttendanceController extends Controller
 
         if ($month && $year) {
             $query->whereMonth('date', $month)->whereYear('date', $year);
-        } else {
-            // Default: last 30 records
-            $query->take(30);
         }
+        
+        $perPage = $request->input('per_page', 10);
+        $paginator = $query->paginate($perPage);
 
-        $records = $query->get()->map(function ($record) {
+        $records = $paginator->map(function ($record) {
             return [
                 'id'       => $record->id,
                 'date'     => Carbon::parse($record->date)->translatedFormat('d M Y'),
@@ -131,6 +131,12 @@ class AttendanceController extends Controller
         return response()->json([
             'success' => true,
             'data'    => $records,
+            'meta'    => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total()
+            ]
         ]);
     }
 
@@ -215,24 +221,37 @@ class AttendanceController extends Controller
      */
     public function getCorrections(Request $request)
     {
-        $corrections = AttendanceCorrection::where('user_id', $request->user()->id)
-            ->orderBy('created_at', 'desc')
-            ->get()
-            ->map(function ($c) {
-                return [
-                    'id'         => $c->id,
-                    'date'       => Carbon::parse($c->date)->translatedFormat('d F Y'),
-                    'raw_date'   => $c->date,
-                    'type'       => $c->type,
-                    'reason'     => $c->reason,
-                    'status'     => $c->status,
-                    'created_at' => $c->created_at->format('d/m/Y H:i'),
-                ];
-            });
+        $query = AttendanceCorrection::where('user_id', $request->user()->id)
+            ->orderBy('created_at', 'desc');
+
+        if ($request->has('status') && $request->status) {
+            $query->where('status', $request->status);
+        }
+
+        $perPage = $request->input('per_page', 10);
+        $paginator = $query->paginate($perPage);
+
+        $corrections = $paginator->map(function ($c) {
+            return [
+                'id'         => $c->id,
+                'date'       => Carbon::parse($c->date)->translatedFormat('d F Y'),
+                'raw_date'   => $c->date,
+                'type'       => $c->type,
+                'reason'     => $c->reason,
+                'status'     => $c->status,
+                'created_at' => $c->created_at->format('d/m/Y H:i'),
+            ];
+        });
 
         return response()->json([
             'success' => true,
             'data'    => $corrections,
+            'meta'    => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total()
+            ]
         ]);
     }
 }

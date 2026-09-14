@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use App\Http\Requests\UpdateProfileRequest;
+use App\Models\Lecturer;
 
 class UserController extends Controller
 {
@@ -104,6 +106,37 @@ class UserController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Pengguna berhasil dihapus'
+        ]);
+    }
+
+    /**
+     * Update user's own profile.
+     */
+    public function updateProfile(UpdateProfileRequest $request)
+    {
+        $user = $request->user();
+        $validated = $request->validated();
+
+        if (!empty($validated['new_password'])) {
+            if (!Hash::check($validated['current_password'], $user->password)) {
+                return response()->json(['success' => false, 'message' => 'Password saat ini salah.'], 400);
+            }
+            $user->password = Hash::make($validated['new_password']);
+            $user->save();
+        }
+
+        if ($user->role === 'dosen') {
+            $lecturer = Lecturer::where('user_id', $user->id)->first();
+            if ($lecturer) {
+                if (isset($validated['phone'])) $lecturer->phone = $validated['phone'];
+                if (isset($validated['address'])) $lecturer->address = $validated['address'];
+                $lecturer->save();
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Profil berhasil diperbarui'
         ]);
     }
 }
