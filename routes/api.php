@@ -33,6 +33,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/check-in', [AttendanceController::class, 'checkIn']);
         Route::post('/check-out', [AttendanceController::class, 'checkOut']);
         Route::get('/history', [AttendanceController::class, 'history']);
+        Route::get('/summary', [AttendanceController::class, 'summary']);
         Route::post('/corrections', [AttendanceController::class, 'storeCorrection']);
         Route::get('/corrections', [AttendanceController::class, 'getCorrections']);
     });

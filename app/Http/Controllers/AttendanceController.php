@@ -11,29 +11,29 @@ use Carbon\Carbon;
 
 class AttendanceController extends Controller
 {
-    protected $attendanceService;
+    protected AttendanceService $attendanceService;
 
     public function __construct(AttendanceService $attendanceService)
     {
         $this->attendanceService = $attendanceService;
     }
 
+    // ─── Today Status ─────────────────────────────────────────────────────────
+
     /**
-     * Get attendance status for today.
+     * Get real attendance status for today.
      */
     public function today(Request $request)
     {
-        // Mocked response for now
+        $data = $this->attendanceService->getTodayStatus($request->user());
+
         return response()->json([
             'success' => true,
-            'data' => [
-                'status' => 'NOT_CHECKED_IN',
-                'check_in_at' => null,
-                'check_out_at' => null,
-                'location' => null
-            ]
+            'data'    => $data,
         ]);
     }
+
+    // ─── Check-In ─────────────────────────────────────────────────────────────
 
     /**
      * Handle Check-in.
@@ -42,26 +42,27 @@ class AttendanceController extends Controller
     {
         $result = $this->attendanceService->processCheckIn(
             $request->user(),
-            $request->latitude,
-            $request->longitude,
-            $request->accuracy,
-            $request->location_id
+            (float) $request->latitude,
+            (float) $request->longitude,
+            (float) $request->accuracy,
+            $request->location_id ? (int) $request->location_id : null
         );
 
         if (!$result['success']) {
             return response()->json([
                 'success' => false,
                 'message' => $result['message'],
-                'data' => $result['data'] ?? null
             ], 422);
         }
 
         return response()->json([
             'success' => true,
-            'message' => 'Check-in berhasil.',
-            'data' => $result['data'] ?? null
+            'message' => $result['message'],
+            'data'    => $result['data'] ?? null,
         ]);
     }
+
+    // ─── Check-Out ────────────────────────────────────────────────────────────
 
     /**
      * Handle Check-out.
@@ -70,51 +71,105 @@ class AttendanceController extends Controller
     {
         $result = $this->attendanceService->processCheckOut(
             $request->user(),
-            $request->latitude,
-            $request->longitude,
-            $request->accuracy
+            (float) $request->latitude,
+            (float) $request->longitude,
+            (float) $request->accuracy
         );
 
         if (!$result['success']) {
             return response()->json([
                 'success' => false,
                 'message' => $result['message'],
-                'data' => $result['data'] ?? null
             ], 422);
         }
 
         return response()->json([
             'success' => true,
-            'message' => 'Check-out berhasil.',
-            'data' => $result['data'] ?? null
+            'message' => $result['message'],
+            'data'    => $result['data'] ?? null,
         ]);
     }
+
+    // ─── History ──────────────────────────────────────────────────────────────
 
     /**
      * Get attendance history for the authenticated user.
      */
     public function history(Request $request)
     {
-        $records = AttendanceRecord::with(['checkInEvent', 'checkOutEvent'])
+        $month = $request->query('month');
+        $year  = $request->query('year');
+
+        $query = AttendanceRecord::with(['checkInEvent.location', 'checkOutEvent'])
             ->where('user_id', $request->user()->id)
-            ->orderBy('date', 'desc')
-            ->take(30) // Last 30 days
-            ->get()
-            ->map(function ($record) {
-                return [
-                    'id' => $record->id,
-                    'date' => Carbon::parse($record->date)->translatedFormat('d M Y'),
-                    'checkIn' => $record->checkInEvent ? Carbon::parse($record->checkInEvent->event_time)->format('H:i') : '-',
-                    'checkOut' => $record->checkOutEvent ? Carbon::parse($record->checkOutEvent->event_time)->format('H:i') : '-',
-                    'status' => $record->status,
-                ];
-            });
+            ->orderBy('date', 'desc');
+
+        if ($month && $year) {
+            $query->whereMonth('date', $month)->whereYear('date', $year);
+        } else {
+            // Default: last 30 records
+            $query->take(30);
+        }
+
+        $records = $query->get()->map(function ($record) {
+            return [
+                'id'       => $record->id,
+                'date'     => Carbon::parse($record->date)->translatedFormat('d M Y'),
+                'raw_date' => $record->date->toDateString(),
+                'checkIn'  => $record->checkInEvent
+                    ? Carbon::parse($record->checkInEvent->event_time)->format('H:i')
+                    : '-',
+                'checkOut' => $record->checkOutEvent
+                    ? Carbon::parse($record->checkOutEvent->event_time)->format('H:i')
+                    : '-',
+                'location' => $record->checkInEvent?->location?->name ?? '-',
+                'distance' => $record->checkInEvent?->distance,
+                'status'   => $record->status,
+            ];
+        });
 
         return response()->json([
             'success' => true,
-            'data' => $records
+            'data'    => $records,
         ]);
     }
+
+    // ─── Summary ──────────────────────────────────────────────────────────────
+
+    /**
+     * Get monthly attendance summary for the authenticated user.
+     */
+    public function summary(Request $request)
+    {
+        $month = (int) $request->query('month', Carbon::now()->month);
+        $year  = (int) $request->query('year', Carbon::now()->year);
+
+        $records = AttendanceRecord::where('user_id', $request->user()->id)
+            ->whereMonth('date', $month)
+            ->whereYear('date', $year)
+            ->get();
+
+        $hadir         = $records->where('status', 'HADIR')->count();
+        $terlambat     = $records->where('status', 'TERLAMBAT')->count();
+        $tidakHadir    = $records->where('status', 'TIDAK_HADIR')->count();
+        $belumCheckout = $records->whereNotNull('check_in_event_id')
+                                 ->whereNull('check_out_event_id')
+                                 ->count();
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'period'         => Carbon::createFromDate($year, $month, 1)->translatedFormat('F Y'),
+                'hadir'          => $hadir,
+                'terlambat'      => $terlambat,
+                'tidak_hadir'    => $tidakHadir,
+                'belum_checkout' => $belumCheckout,
+                'total'          => $records->count(),
+            ],
+        ]);
+    }
+
+    // ─── Corrections ──────────────────────────────────────────────────────────
 
     /**
      * Submit attendance correction.
@@ -122,48 +177,62 @@ class AttendanceController extends Controller
     public function storeCorrection(Request $request)
     {
         $validated = $request->validate([
-            'date' => 'required|date',
-            'type' => 'required|string',
-            'reason' => 'required|string'
+            'date'   => 'required|date|before_or_equal:today',
+            'type'   => 'required|string|max:100',
+            'reason' => 'required|string|max:1000',
         ]);
+
+        // Check for duplicate pending correction on the same date
+        $duplicate = AttendanceCorrection::where('user_id', $request->user()->id)
+            ->where('date', $validated['date'])
+            ->where('status', 'PENDING')
+            ->exists();
+
+        if ($duplicate) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda sudah mengajukan koreksi untuk tanggal ini dan masih menunggu persetujuan.',
+            ], 422);
+        }
 
         $correction = AttendanceCorrection::create([
             'user_id' => $request->user()->id,
-            'date' => $validated['date'],
-            'type' => $validated['type'],
-            'reason' => $validated['reason'],
-            'status' => 'PENDING'
+            'date'    => $validated['date'],
+            'type'    => $validated['type'],
+            'reason'  => $validated['reason'],
+            'status'  => 'PENDING',
         ]);
 
         return response()->json([
             'success' => true,
-            'message' => 'Pengajuan koreksi presensi berhasil dikirim',
-            'data' => $correction
+            'message' => 'Pengajuan koreksi presensi berhasil dikirim.',
+            'data'    => $correction,
         ]);
     }
 
     /**
-     * Get user corrections.
+     * Get corrections for the authenticated user.
      */
     public function getCorrections(Request $request)
     {
         $corrections = AttendanceCorrection::where('user_id', $request->user()->id)
-                            ->orderBy('created_at', 'desc')
-                            ->get()
-                            ->map(function($c) {
-                                return [
-                                    'id' => $c->id,
-                                    'date' => Carbon::parse($c->date)->translatedFormat('d F Y'),
-                                    'type' => $c->type,
-                                    'reason' => $c->reason,
-                                    'status' => $c->status,
-                                    'created_at' => $c->created_at->format('d/m/Y H:i')
-                                ];
-                            });
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function ($c) {
+                return [
+                    'id'         => $c->id,
+                    'date'       => Carbon::parse($c->date)->translatedFormat('d F Y'),
+                    'raw_date'   => $c->date,
+                    'type'       => $c->type,
+                    'reason'     => $c->reason,
+                    'status'     => $c->status,
+                    'created_at' => $c->created_at->format('d/m/Y H:i'),
+                ];
+            });
 
         return response()->json([
             'success' => true,
-            'data' => $corrections
+            'data'    => $corrections,
         ]);
     }
 }
