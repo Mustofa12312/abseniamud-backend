@@ -4,9 +4,19 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Schedule;
+use App\Http\Requests\StoreScheduleRequest;
+use App\Http\Requests\UpdateScheduleRequest;
+use App\Services\ScheduleService;
 
 class ScheduleController extends Controller
 {
+    protected $scheduleService;
+
+    public function __construct(ScheduleService $scheduleService)
+    {
+        $this->scheduleService = $scheduleService;
+    }
+
     public function index(Request $request)
     {
         $query = Schedule::with(['course.lecturer.user', 'room']);
@@ -47,33 +57,58 @@ class ScheduleController extends Controller
         return response()->json(['success' => true, 'data' => $groupedSchedules]);
     }
 
-    public function store(Request $request)
+    public function store(StoreScheduleRequest $request)
     {
-        $validated = $request->validate([
-            'course_id' => 'required|exists:courses,id',
-            'room_id' => 'required|exists:rooms,id',
-            'day_of_week' => 'required|in:Senin,Selasa,Rabu,Kamis,Jumat,Sabtu,Minggu',
-            'start_time' => 'required|date_format:H:i',
-            'end_time' => 'required|date_format:H:i|after:start_time',
-        ]);
-
+        $validated = $request->validated();
+        
+        if ($this->scheduleService->hasConflict(
+            $validated['room_id'],
+            $validated['day_of_week'],
+            $validated['start_time'],
+            $validated['end_time']
+        )) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Konflik jadwal: Ruangan sudah digunakan pada waktu tersebut.'
+            ], 422);
+        }
+        
         $schedule = Schedule::create($validated);
-        return response()->json(['success' => true, 'message' => 'Jadwal berhasil ditambahkan', 'data' => $schedule]);
+        $schedule->load(['course.lecturer.user', 'room']);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Jadwal berhasil ditambahkan',
+            'data' => $schedule
+        ]);
     }
 
-    public function update(Request $request, $id)
+    public function update(UpdateScheduleRequest $request, $id)
     {
         $schedule = Schedule::findOrFail($id);
-        $validated = $request->validate([
-            'course_id' => 'required|exists:courses,id',
-            'room_id' => 'required|exists:rooms,id',
-            'day_of_week' => 'required|in:Senin,Selasa,Rabu,Kamis,Jumat,Sabtu,Minggu',
-            'start_time' => 'required|date_format:H:i',
-            'end_time' => 'required|date_format:H:i|after:start_time',
-        ]);
+        $validated = $request->validated();
+
+        if ($this->scheduleService->hasConflict(
+            $validated['room_id'],
+            $validated['day_of_week'],
+            $validated['start_time'],
+            $validated['end_time'],
+            $schedule->id
+        )) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Konflik jadwal: Ruangan sudah digunakan pada waktu tersebut.'
+            ], 422);
+        }
 
         $schedule->update($validated);
-        return response()->json(['success' => true, 'message' => 'Jadwal berhasil diperbarui', 'data' => $schedule]);
+        $schedule->load(['course.lecturer.user', 'room']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Jadwal berhasil diperbarui',
+            'data' => $schedule
+        ]);
     }
 
     public function destroy($id)

@@ -19,6 +19,10 @@ use App\Http\Requests\StoreLocationRequest;
 use App\Http\Requests\UpdateLocationRequest;
 use App\Http\Requests\StoreLecturerRequest;
 use App\Http\Requests\UpdateLecturerRequest;
+use App\Http\Resources\LocationResource;
+use App\Http\Resources\LecturerResource;
+use App\Http\Resources\CorrectionResource;
+use App\Http\Resources\AuditLogResource;
 
 class AdminController extends Controller
 {
@@ -132,22 +136,11 @@ class AdminController extends Controller
      */
     public function locations()
     {
-        $locations = Location::all()->map(function($loc) {
-            return [
-                'id' => $loc->id,
-                'name' => $loc->name,
-                'lat' => $loc->latitude,
-                'lng' => $loc->longitude,
-                'radius' => $loc->radius,
-                'accuracy' => $loc->max_accuracy,
-                'is_active' => $loc->is_active,
-                'status' => $loc->is_active ? 'Aktif' : 'Nonaktif'
-            ];
-        });
+        $locations = Location::all();
 
         return response()->json([
             'success' => true,
-            'data' => $locations
+            'data' => LocationResource::collection($locations)
         ]);
     }
 
@@ -179,22 +172,11 @@ class AdminController extends Controller
      */
     public function lecturers()
     {
-        $lecturers = Lecturer::with('user')->get()->map(function($lec) {
-            return [
-                'id' => $lec->id,
-                'name' => $lec->user->name ?? 'Unknown',
-                'email' => $lec->user->email ?? '-',
-                'nidn' => $lec->nidn ?? '-',
-                'nip' => $lec->nip ?? '-',
-                'phone' => $lec->phone ?? '-',
-                'address' => $lec->address ?? '-',
-                'user_id' => $lec->user_id
-            ];
-        });
+        $lecturers = Lecturer::with('user')->get();
 
         return response()->json([
             'success' => true,
-            'data' => $lecturers
+            'data' => LecturerResource::collection($lecturers)
         ]);
     }
 
@@ -367,25 +349,28 @@ class AdminController extends Controller
     /**
      * Get all corrections for admin.
      */
-    public function corrections()
+    public function corrections(Request $request)
     {
-        $corrections = AttendanceCorrection::with('user')->orderBy('created_at', 'desc')->get()->map(function($c) {
-            return [
-                'id' => $c->id,
-                'name' => $c->user->name ?? 'Unknown',
-                'date' => Carbon::parse($c->date)->translatedFormat('d M Y'),
-                'raw_date' => $c->date,
-                'type' => $c->type,
-                'reason' => $c->reason,
-                'status' => $c->status,
-                'submitted_at' => $c->created_at->format('d/m/Y H:i'),
-                'user_id' => $c->user_id
-            ];
-        });
+        $query = AttendanceCorrection::with('user')->orderBy('created_at', 'desc');
+
+        // Optional filter
+        if ($request->has('status') && $request->status) {
+            $query->where('status', $request->status);
+        }
+
+        // Pagination
+        $perPage = $request->input('per_page', 10);
+        $corrections = $query->paginate($perPage);
 
         return response()->json([
             'success' => true,
-            'data' => $corrections
+            'data' => CorrectionResource::collection($corrections->items()),
+            'meta' => [
+                'current_page' => $corrections->currentPage(),
+                'last_page' => $corrections->lastPage(),
+                'per_page' => $corrections->perPage(),
+                'total' => $corrections->total()
+            ]
         ]);
     }
 
@@ -467,23 +452,26 @@ class AdminController extends Controller
     /**
      * Get all audit logs for admin.
      */
-    public function auditLogs()
+    public function auditLogs(Request $request)
     {
-        $logs = AuditLog::with('user')->orderBy('created_at', 'desc')->get()->map(function($l) {
-            return [
-                'id' => $l->id,
-                'admin_name' => $l->user->name ?? 'System',
-                'action' => $l->action,
-                'target' => $l->target,
-                'details' => $l->details,
-                'ip_address' => $l->ip_address,
-                'created_at' => $l->created_at->format('d/m/Y H:i:s')
-            ];
-        });
+        $query = AuditLog::with('user')->orderBy('created_at', 'desc');
+
+        if ($request->has('action') && $request->action) {
+            $query->where('action', $request->action);
+        }
+
+        $perPage = $request->input('per_page', 20);
+        $logs = $query->paginate($perPage);
 
         return response()->json([
             'success' => true,
-            'data' => $logs
+            'data' => AuditLogResource::collection($logs->items()),
+            'meta' => [
+                'current_page' => $logs->currentPage(),
+                'last_page' => $logs->lastPage(),
+                'per_page' => $logs->perPage(),
+                'total' => $logs->total()
+            ]
         ]);
     }
 

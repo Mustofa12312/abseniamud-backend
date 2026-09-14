@@ -5,6 +5,10 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Position;
 use App\Models\Assignment;
+use App\Http\Requests\StorePositionRequest;
+use App\Http\Requests\UpdatePositionRequest;
+use App\Http\Requests\StoreAssignmentRequest;
+use App\Http\Requests\UpdateAssignmentRequest;
 
 class AssignmentController extends Controller
 {
@@ -16,21 +20,17 @@ class AssignmentController extends Controller
         return response()->json(['success' => true, 'data' => $positions]);
     }
 
-    public function storePosition(Request $request)
+    public function storePosition(StorePositionRequest $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|unique:positions,name'
-        ]);
+        $validated = $request->validated();
         $position = Position::create($validated);
         return response()->json(['success' => true, 'message' => 'Jabatan berhasil ditambahkan', 'data' => $position]);
     }
 
-    public function updatePosition(Request $request, $id)
+    public function updatePosition(UpdatePositionRequest $request, $id)
     {
         $position = Position::findOrFail($id);
-        $validated = $request->validate([
-            'name' => 'required|string|unique:positions,name,' . $id
-        ]);
+        $validated = $request->validated();
         $position->update($validated);
         return response()->json(['success' => true, 'message' => 'Jabatan berhasil diperbarui', 'data' => $position]);
     }
@@ -65,13 +65,9 @@ class AssignmentController extends Controller
         return response()->json(['success' => true, 'data' => $assignments]);
     }
 
-    public function storeAssignment(Request $request)
+    public function storeAssignment(StoreAssignmentRequest $request)
     {
-        $validated = $request->validate([
-            'lecturer_id' => 'required|exists:lecturers,id',
-            'position_id' => 'required|exists:positions,id',
-            'is_primary' => 'boolean'
-        ]);
+        $validated = $request->validated();
 
         if (!empty($validated['is_primary']) && $validated['is_primary']) {
             Assignment::where('lecturer_id', $validated['lecturer_id'])->update(['is_primary' => false]);
@@ -83,14 +79,10 @@ class AssignmentController extends Controller
         return response()->json(['success' => true, 'message' => 'Penugasan berhasil ditambahkan', 'data' => $assignment]);
     }
 
-    public function updateAssignment(Request $request, $id)
+    public function updateAssignment(UpdateAssignmentRequest $request, $id)
     {
         $assignment = Assignment::findOrFail($id);
-        $validated = $request->validate([
-            'lecturer_id' => 'required|exists:lecturers,id',
-            'position_id' => 'required|exists:positions,id',
-            'is_primary' => 'boolean'
-        ]);
+        $validated = $request->validated();
 
         if (!empty($validated['is_primary']) && $validated['is_primary']) {
             Assignment::where('lecturer_id', $validated['lecturer_id'])
