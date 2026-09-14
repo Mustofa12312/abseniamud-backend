@@ -38,8 +38,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/corrections', [AttendanceController::class, 'getCorrections']);
     });
 
-    // Admin Routes (can be guarded by role middleware later)
-    Route::prefix('admin')->group(function () {
+    // Admin Routes
+    Route::prefix('admin')->middleware('role:super_admin,admin_akademik')->group(function () {
         Route::get('/dashboard', [AdminController::class, 'dashboard']);
         Route::get('/attendance', [AdminController::class, 'attendance']);
         // Master Data
