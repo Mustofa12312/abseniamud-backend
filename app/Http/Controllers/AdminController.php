@@ -134,8 +134,9 @@ class AdminController extends Controller
                 'name' => $loc->name,
                 'lat' => $loc->latitude,
                 'lng' => $loc->longitude,
-                'radius' => $loc->radius . 'm',
-                'accuracy' => $loc->max_accuracy . 'm',
+                'radius' => $loc->radius,
+                'accuracy' => $loc->max_accuracy,
+                'is_active' => $loc->is_active,
                 'status' => $loc->is_active ? 'Aktif' : 'Nonaktif'
             ];
         });
@@ -144,6 +145,43 @@ class AdminController extends Controller
             'success' => true,
             'data' => $locations
         ]);
+    }
+
+    public function storeLocation(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string',
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric',
+            'radius' => 'required|numeric',
+            'max_accuracy' => 'required|numeric',
+            'is_active' => 'boolean'
+        ]);
+
+        $location = Location::create($validated);
+        return response()->json(['success' => true, 'message' => 'Lokasi berhasil ditambahkan.', 'data' => $location]);
+    }
+
+    public function updateLocation(Request $request, $id)
+    {
+        $location = Location::findOrFail($id);
+        $validated = $request->validate([
+            'name' => 'required|string',
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric',
+            'radius' => 'required|numeric',
+            'max_accuracy' => 'required|numeric',
+            'is_active' => 'boolean'
+        ]);
+
+        $location->update($validated);
+        return response()->json(['success' => true, 'message' => 'Lokasi berhasil diperbarui.', 'data' => $location]);
+    }
+
+    public function destroyLocation($id)
+    {
+        Location::findOrFail($id)->delete();
+        return response()->json(['success' => true, 'message' => 'Lokasi berhasil dihapus.']);
     }
 
     /**
@@ -159,6 +197,8 @@ class AdminController extends Controller
                 'nidn' => $lec->nidn ?? '-',
                 'nip' => $lec->nip ?? '-',
                 'phone' => $lec->phone ?? '-',
+                'address' => $lec->address ?? '-',
+                'user_id' => $lec->user_id
             ];
         });
 
@@ -166,6 +206,81 @@ class AdminController extends Controller
             'success' => true,
             'data' => $lecturers
         ]);
+    }
+
+    public function storeLecturer(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:6',
+            'nidn' => 'nullable|string',
+            'nip' => 'nullable|string',
+            'phone' => 'nullable|string',
+            'address' => 'nullable|string',
+        ]);
+
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => \Illuminate\Support\Facades\Hash::make($validated['password']),
+            'role_id' => 3 // Assuming 3 is dosen
+        ]);
+
+        $lecturer = Lecturer::create([
+            'user_id' => $user->id,
+            'nidn' => $validated['nidn'] ?? null,
+            'nip' => $validated['nip'] ?? null,
+            'phone' => $validated['phone'] ?? null,
+            'address' => $validated['address'] ?? null,
+        ]);
+
+        return response()->json(['success' => true, 'message' => 'Dosen berhasil ditambahkan.', 'data' => $lecturer]);
+    }
+
+    public function updateLecturer(Request $request, $id)
+    {
+        $lecturer = Lecturer::findOrFail($id);
+        $user = $lecturer->user;
+
+        $validated = $request->validate([
+            'name' => 'required|string',
+            'email' => 'required|email|unique:users,email,' . ($user ? $user->id : ''),
+            'nidn' => 'nullable|string',
+            'nip' => 'nullable|string',
+            'phone' => 'nullable|string',
+            'address' => 'nullable|string',
+        ]);
+
+        if ($user) {
+            $user->update([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+            ]);
+            
+            if ($request->filled('password')) {
+                $user->update(['password' => \Illuminate\Support\Facades\Hash::make($request->password)]);
+            }
+        }
+
+        $lecturer->update([
+            'nidn' => $validated['nidn'] ?? null,
+            'nip' => $validated['nip'] ?? null,
+            'phone' => $validated['phone'] ?? null,
+            'address' => $validated['address'] ?? null,
+        ]);
+
+        return response()->json(['success' => true, 'message' => 'Dosen berhasil diperbarui.', 'data' => $lecturer]);
+    }
+
+    public function destroyLecturer($id)
+    {
+        $lecturer = Lecturer::findOrFail($id);
+        if ($lecturer->user) {
+            $lecturer->user->delete();
+        }
+        // Lecturer will be deleted due to cascade
+        return response()->json(['success' => true, 'message' => 'Dosen berhasil dihapus.']);
     }
 
     /**
@@ -214,32 +329,7 @@ class AdminController extends Controller
         ]);
     }
 
-    /**
-     * Get teaching schedules (mock implementation).
-     */
-    public function schedules()
-    {
-        // Mock data for schedules
-        $schedules = [
-            'Senin' => [
-                ['id' => 1, 'time' => '08:00 - 10:30', 'course' => 'Pemrograman Web Lanjut', 'lecturer' => 'Ahmad', 'room' => 'Lab Komputer A'],
-                ['id' => 2, 'time' => '13:00 - 15:30', 'course' => 'Basis Data Terdistribusi', 'lecturer' => 'Ahmad', 'room' => 'Ruang 201'],
-            ],
-            'Selasa' => [
-                ['id' => 3, 'time' => '09:00 - 11:30', 'course' => 'Rekayasa Perangkat Lunak', 'lecturer' => 'Budi', 'room' => 'Ruang 104'],
-            ],
-            'Rabu' => [],
-            'Kamis' => [],
-            'Jumat' => [],
-            'Sabtu' => [],
-            'Minggu' => [],
-        ];
-
-        return response()->json([
-            'success' => true,
-            'data' => $schedules
-        ]);
-    }
+    // Schedules moved to ScheduleController
 
     /**
      * Get system settings.

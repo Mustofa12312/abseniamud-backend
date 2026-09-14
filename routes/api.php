@@ -44,8 +44,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/attendance', [AdminController::class, 'attendance']);
         // Master Data
         Route::get('/locations', [AdminController::class, 'locations']);
+        Route::post('/locations', [AdminController::class, 'storeLocation']);
+        Route::put('/locations/{id}', [AdminController::class, 'updateLocation']);
+        Route::delete('/locations/{id}', [AdminController::class, 'destroyLocation']);
+        
         Route::get('/lecturers', [AdminController::class, 'lecturers']);
         Route::post('/lecturers', [AdminController::class, 'storeLecturer']);
+        Route::put('/lecturers/{id}', [AdminController::class, 'updateLecturer']);
+        Route::delete('/lecturers/{id}', [AdminController::class, 'destroyLecturer']);
         
         // Rooms
         Route::get('/rooms', [AdminController::class, 'rooms']);
@@ -65,6 +71,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/courses/{id}', [AdminController::class, 'updateCourse']);
         Route::delete('/courses/{id}', [AdminController::class, 'destroyCourse']);
 
+        // Positions & Assignments
+        Route::get('/positions', [\App\Http\Controllers\AssignmentController::class, 'positions']);
+        Route::post('/positions', [\App\Http\Controllers\AssignmentController::class, 'storePosition']);
+        Route::put('/positions/{id}', [\App\Http\Controllers\AssignmentController::class, 'updatePosition']);
+        Route::delete('/positions/{id}', [\App\Http\Controllers\AssignmentController::class, 'destroyPosition']);
+
+        Route::get('/assignments', [\App\Http\Controllers\AssignmentController::class, 'assignments']);
+        Route::post('/assignments', [\App\Http\Controllers\AssignmentController::class, 'storeAssignment']);
+        Route::put('/assignments/{id}', [\App\Http\Controllers\AssignmentController::class, 'updateAssignment']);
+        Route::delete('/assignments/{id}', [\App\Http\Controllers\AssignmentController::class, 'destroyAssignment']);
+
         // Academic Years
         Route::get('/academic-years', [AdminController::class, 'academicYears']);
         Route::get('/academic-years/active', [AdminController::class, 'activeAcademicYear']);
@@ -79,7 +96,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/users/{id}', [UserController::class, 'destroy']);
         
         Route::get('/reports', [AdminController::class, 'reports']);
-        Route::get('/schedules', [AdminController::class, 'schedules']);
+        
+        // Schedules
+        Route::get('/schedules', [\App\Http\Controllers\ScheduleController::class, 'index']);
+        Route::post('/schedules', [\App\Http\Controllers\ScheduleController::class, 'store']);
+        Route::put('/schedules/{id}', [\App\Http\Controllers\ScheduleController::class, 'update']);
+        Route::delete('/schedules/{id}', [\App\Http\Controllers\ScheduleController::class, 'destroy']);
+        
         Route::get('/settings', [AdminController::class, 'settings']);
         Route::post('/settings', [AdminController::class, 'updateSettings']);
         
