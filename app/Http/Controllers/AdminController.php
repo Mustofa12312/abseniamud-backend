@@ -15,6 +15,10 @@ use App\Models\Faculty;
 use App\Models\Course;
 use App\Models\AcademicYear;
 use Carbon\Carbon;
+use App\Http\Requests\StoreLocationRequest;
+use App\Http\Requests\UpdateLocationRequest;
+use App\Http\Requests\StoreLecturerRequest;
+use App\Http\Requests\UpdateLecturerRequest;
 
 class AdminController extends Controller
 {
@@ -147,32 +151,18 @@ class AdminController extends Controller
         ]);
     }
 
-    public function storeLocation(Request $request)
+    public function storeLocation(StoreLocationRequest $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string',
-            'latitude' => 'required|numeric',
-            'longitude' => 'required|numeric',
-            'radius' => 'required|numeric',
-            'max_accuracy' => 'required|numeric',
-            'is_active' => 'boolean'
-        ]);
+        $validated = $request->validated();
 
         $location = Location::create($validated);
         return response()->json(['success' => true, 'message' => 'Lokasi berhasil ditambahkan.', 'data' => $location]);
     }
 
-    public function updateLocation(Request $request, $id)
+    public function updateLocation(UpdateLocationRequest $request, $id)
     {
         $location = Location::findOrFail($id);
-        $validated = $request->validate([
-            'name' => 'required|string',
-            'latitude' => 'required|numeric',
-            'longitude' => 'required|numeric',
-            'radius' => 'required|numeric',
-            'max_accuracy' => 'required|numeric',
-            'is_active' => 'boolean'
-        ]);
+        $validated = $request->validated();
 
         $location->update($validated);
         return response()->json(['success' => true, 'message' => 'Lokasi berhasil diperbarui.', 'data' => $location]);
@@ -208,17 +198,9 @@ class AdminController extends Controller
         ]);
     }
 
-    public function storeLecturer(Request $request)
+    public function storeLecturer(StoreLecturerRequest $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:6',
-            'nidn' => 'nullable|string',
-            'nip' => 'nullable|string',
-            'phone' => 'nullable|string',
-            'address' => 'nullable|string',
-        ]);
+        $validated = $request->validated();
 
         $user = User::create([
             'name' => $validated['name'],
@@ -238,19 +220,12 @@ class AdminController extends Controller
         return response()->json(['success' => true, 'message' => 'Dosen berhasil ditambahkan.', 'data' => $lecturer]);
     }
 
-    public function updateLecturer(Request $request, $id)
+    public function updateLecturer(UpdateLecturerRequest $request, $id)
     {
         $lecturer = Lecturer::findOrFail($id);
         $user = $lecturer->user;
 
-        $validated = $request->validate([
-            'name' => 'required|string',
-            'email' => 'required|email|unique:users,email,' . ($user ? $user->id : ''),
-            'nidn' => 'nullable|string',
-            'nip' => 'nullable|string',
-            'phone' => 'nullable|string',
-            'address' => 'nullable|string',
-        ]);
+        $validated = $request->validated();
 
         if ($user) {
             $user->update([
