@@ -9,6 +9,8 @@ use Illuminate\Validation\Rule;
 use App\Http\Requests\UpdateProfileRequest;
 use App\Models\Lecturer;
 
+use App\Models\Role;
+
 class UserController extends Controller
 {
     /**
@@ -16,12 +18,12 @@ class UserController extends Controller
      */
     public function index()
     {
-        $users = User::orderBy('created_at', 'desc')->get()->map(function($u) {
+        $users = User::with('role')->orderBy('created_at', 'desc')->get()->map(function($u) {
             return [
                 'id' => $u->id,
                 'name' => $u->name,
                 'email' => $u->email,
-                'role' => $u->role,
+                'role' => $u->role ? $u->role->name : null,
                 'is_active' => true, // Placeholder for future active/inactive feature
                 'created_at' => $u->created_at->format('d M Y')
             ];
@@ -45,11 +47,13 @@ class UserController extends Controller
             'role' => 'required|string|in:super_admin,admin_akademik,admin_keuangan,dosen'
         ]);
 
+        $role = Role::where('name', $validated['role'])->first();
+
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
-            'role' => $validated['role']
+            'role_id' => $role ? $role->id : null
         ]);
 
         return response()->json([
@@ -75,7 +79,10 @@ class UserController extends Controller
 
         if (isset($validated['name'])) $user->name = $validated['name'];
         if (isset($validated['email'])) $user->email = $validated['email'];
-        if (isset($validated['role'])) $user->role = $validated['role'];
+        if (isset($validated['role'])) {
+            $role = Role::where('name', $validated['role'])->first();
+            $user->role_id = $role ? $role->id : null;
+        }
         if (!empty($validated['password'])) {
             $user->password = Hash::make($validated['password']);
         }

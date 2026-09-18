@@ -9,6 +9,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\LecturerController;
 use App\Http\Controllers\MasterDataController;
+use App\Http\Controllers\ReportExportController;
 
 /*
 |--------------------------------------------------------------------------
@@ -101,6 +102,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/users/{id}', [UserController::class, 'destroy']);
         
         Route::get('/reports', [AdminController::class, 'reports']);
+        Route::get('/reports/export', [ReportExportController::class, 'exportCsv']);
         
         // Schedules
         Route::get('/schedules', [\App\Http\Controllers\ScheduleController::class, 'index']);
