@@ -54,22 +54,43 @@ class AdminController extends Controller
                             
         $lokasiAktif = Location::where('is_active', true)->count();
 
-        // Recent activity (mocked structure, getting from AttendanceRecord/Event in real world)
-        // For simplicity, we just pull the recent records
-        $recentActivity = AttendanceRecord::with('user')
+        // Recent activity fix
+        $recentActivity = AttendanceRecord::with(['user', 'checkInEvent.location', 'checkOutEvent'])
                             ->where('date', $today)
                             ->orderBy('updated_at', 'desc')
                             ->take(5)
                             ->get()
                             ->map(function($record) {
+                                $isCheckOut = $record->checkOutEvent && $record->updated_at->eq($record->checkOutEvent->created_at);
                                 return [
                                     'name' => $record->user->name ?? 'Unknown',
-                                    'action' => 'Check-in/out',
+                                    'action' => $isCheckOut ? 'Check-out' : 'Check-in',
                                     'time' => $record->updated_at->format('H:i'),
-                                    'location' => 'Kampus', // would link to event's location
+                                    'location' => $record->checkInEvent ? ($record->checkInEvent->location ? $record->checkInEvent->location->name : 'Lokasi Khusus') : 'Sistem',
                                     'late' => $record->status === 'TERLAMBAT'
                                 ];
                             });
+                            
+        // Chart data for current week (Senin - Jumat)
+        $startOfWeek = Carbon::now()->startOfWeek();
+        $chartData = [];
+        $days = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum'];
+        
+        for ($i = 0; $i < 5; $i++) {
+            $currentDay = $startOfWeek->copy()->addDays($i);
+            if ($totalDosen > 0 && $currentDay->lte(Carbon::today())) {
+                $hadir = AttendanceRecord::where('date', $currentDay->toDateString())
+                            ->where('status', '!=', 'TIDAK_HADIR')
+                            ->count();
+                $percentage = round(($hadir / $totalDosen) * 100);
+            } else {
+                $percentage = 0;
+            }
+            $chartData[] = [
+                'day' => $days[$i],
+                'value' => $percentage
+            ];
+        }
 
         return response()->json([
             'success' => true,
@@ -80,7 +101,8 @@ class AdminController extends Controller
                     ['title' => 'Terlambat', 'value' => $terlambat],
                     ['title' => 'Lokasi Aktif', 'value' => $lokasiAktif],
                 ],
-                'recent_activity' => $recentActivity
+                'recent_activity' => $recentActivity,
+                'chart_data' => $chartData
             ]
         ]);
     }
@@ -198,23 +220,52 @@ class AdminController extends Controller
         $year = $request->query('year', Carbon::now()->year);
 
         // Simple aggregation logic for the report
-        $records = AttendanceRecord::whereMonth('date', $month)
-                        ->whereYear('date', $year)
-                        ->get();
+        $query = AttendanceRecord::whereYear('date', $year);
+        
+        if ($month !== 'all') {
+            $query->whereMonth('date', $month);
+        }
+        
+        $records = $query->get();
 
         $lecturers = Lecturer::with('user')->get();
         $reportData = [];
 
         // Calculate working days dynamically (excluding Sundays)
-        $startOfMonth = Carbon::create($year, $month, 1);
-        $daysInMonth = $startOfMonth->daysInMonth;
         $totalDays = 0;
         
-        for ($d = 1; $d <= $daysInMonth; $d++) {
-            $currentDate = Carbon::create($year, $month, $d);
-            if (!$currentDate->isSunday()) {
-                $totalDays++;
+        if ($month === 'all') {
+            $startOfYear = Carbon::create($year, 1, 1);
+            $endOfYear = Carbon::create($year, 12, 31);
+            
+            // Limit to today if year is current year to prevent future days being counted
+            if ($year == Carbon::now()->year) {
+                $endOfYear = Carbon::now();
             }
+            
+            for ($d = $startOfYear->copy(); $d->lte($endOfYear); $d->addDay()) {
+                if (!$d->isSunday()) {
+                    $totalDays++;
+                }
+            }
+            $periodLabel = "Sepanjang Tahun " . $year;
+        } else {
+            $startOfMonth = Carbon::create($year, $month, 1);
+            $daysInMonth = $startOfMonth->daysInMonth;
+            
+            // Limit to today if month and year is current
+            $limitDay = $daysInMonth;
+            if ($year == Carbon::now()->year && $month == Carbon::now()->month) {
+                $limitDay = Carbon::now()->day;
+            }
+            
+            for ($d = 1; $d <= $limitDay; $d++) {
+                $currentDate = Carbon::create($year, $month, $d);
+                if (!$currentDate->isSunday()) {
+                    $totalDays++;
+                }
+            }
+            $periodLabel = Carbon::createFromDate($year, $month, 1)->translatedFormat('F Y');
         }
         
         if ($totalDays === 0) $totalDays = 1; // Prevent division by zero
@@ -244,7 +295,7 @@ class AdminController extends Controller
         return response()->json([
             'success' => true,
             'data' => $reportData,
-            'period' => Carbon::createFromDate($year, $month, 1)->translatedFormat('F Y')
+            'period' => $periodLabel
         ]);
     }
 
