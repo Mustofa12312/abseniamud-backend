@@ -45,7 +45,9 @@ class AttendanceController extends Controller
             (float) $request->latitude,
             (float) $request->longitude,
             (float) $request->accuracy,
-            $request->location_id ? (int) $request->location_id : null
+            $request->location_id ? (int) $request->location_id : null,
+            $request->ip(),
+            $request->userAgent()
         );
 
         if (!$result['success']) {
@@ -73,7 +75,9 @@ class AttendanceController extends Controller
             $request->user(),
             (float) $request->latitude,
             (float) $request->longitude,
-            (float) $request->accuracy
+            (float) $request->accuracy,
+            $request->ip(),
+            $request->userAgent()
         );
 
         if (!$result['success']) {

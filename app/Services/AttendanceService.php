@@ -28,9 +28,11 @@ class AttendanceService
      * @param  float  $lon
      * @param  float  $accuracy  GPS accuracy in meters
      * @param  int|null  $locationId  Optional — if null, nearest active location is used
+     * @param  string|null  $ip
+     * @param  string|null  $userAgent
      * @return array{success: bool, message: string, data?: array}
      */
-    public function processCheckIn($user, float $lat, float $lon, float $accuracy, ?int $locationId = null): array
+    public function processCheckIn($user, float $lat, float $lon, float $accuracy, ?int $locationId = null, ?string $ip = null, ?string $userAgent = null): array
     {
         $today = Carbon::today();
 
@@ -81,6 +83,8 @@ class AttendanceService
                 'status'      => 'REJECTED',
                 'reason'      => $validation['reason'],
                 'event_time'  => $now,
+                'ip_address'  => $ip,
+                'user_agent'  => $userAgent,
             ]);
 
             return [
@@ -112,6 +116,8 @@ class AttendanceService
                 'status'      => 'VALID',
                 'reason'      => null,
                 'event_time'  => $now,
+                'ip_address'  => $ip,
+                'user_agent'  => $userAgent,
             ]);
 
             AttendanceRecord::updateOrCreate(
@@ -144,9 +150,11 @@ class AttendanceService
      * @param  float  $lat
      * @param  float  $lon
      * @param  float  $accuracy
+     * @param  string|null  $ip
+     * @param  string|null  $userAgent
      * @return array{success: bool, message: string, data?: array}
      */
-    public function processCheckOut($user, float $lat, float $lon, float $accuracy): array
+    public function processCheckOut($user, float $lat, float $lon, float $accuracy, ?string $ip = null, ?string $userAgent = null): array
     {
         $today = Carbon::today();
 
@@ -202,6 +210,8 @@ class AttendanceService
                 'status'      => 'REJECTED',
                 'reason'      => $validation['reason'],
                 'event_time'  => $now,
+                'ip_address'  => $ip,
+                'user_agent'  => $userAgent,
             ]);
 
             return [
@@ -223,6 +233,8 @@ class AttendanceService
                 'status'      => 'VALID',
                 'reason'      => null,
                 'event_time'  => $now,
+                'ip_address'  => $ip,
+                'user_agent'  => $userAgent,
             ]);
 
             $record->update([

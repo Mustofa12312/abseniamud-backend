@@ -103,6 +103,8 @@ class AdminController extends Controller
                                 'checkOut' => $record->checkOutEvent ? Carbon::parse($record->checkOutEvent->event_time)->format('H:i') : '-',
                                 'location' => $record->checkInEvent->location->name ?? '-',
                                 'status' => $record->status,
+                                'ip_address' => $record->checkInEvent->ip_address ?? null,
+                                'user_agent' => $record->checkInEvent->user_agent ?? null,
                             ];
                         });
                         
@@ -169,6 +171,8 @@ class AdminController extends Controller
                     'checkOut' => $record->checkOutEvent ? Carbon::parse($record->checkOutEvent->event_time)->format('H:i') : '-',
                     'location' => $record->checkInEvent?->location?->name ?? '-',
                     'status'   => $record->status,
+                    'ip_address' => $record->checkInEvent?->ip_address,
+                    'user_agent' => $record->checkInEvent?->user_agent,
                 ];
             });
 

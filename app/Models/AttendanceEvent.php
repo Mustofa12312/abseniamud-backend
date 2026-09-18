@@ -17,6 +17,8 @@ class AttendanceEvent extends Model
         'status',
         'reason',
         'event_time',
+        'ip_address',
+        'user_agent',
     ];
 
     protected $casts = [
