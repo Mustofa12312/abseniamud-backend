@@ -54,6 +54,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/locations/{id}', [LocationController::class, 'update']);
         Route::delete('/locations/{id}', [LocationController::class, 'destroy']);
         
+        Route::get('/lecturers/export', [LecturerController::class, 'exportCsv']);
+        Route::post('/lecturers/import', [LecturerController::class, 'importCsv']);
         Route::get('/lecturers', [LecturerController::class, 'index']);
         Route::post('/lecturers', [LecturerController::class, 'store']);
         Route::put('/lecturers/{id}', [LecturerController::class, 'update']);
